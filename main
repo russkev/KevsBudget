@@ -1,0 +1,573 @@
+// // Declare global constants
+var sheet         = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('KEYWORDS');
+var keyColumn     = 0;
+
+// // -----------------------------------------------------
+// // This is code to create multiple functions to get around the fact that you can't call a 
+// // function with an argument when making a menu.
+for (var i = 0; i < keySheet.getLastColumn();){
+  i++;
+  eval("function addToCategory_" + i + "() { addToCategory(" + i + "); }");
+  eval("function moveAmountTo_"  + i + "() { moveAmountTo("  + i + "); }");
+}
+
+
+// // -----------------------------------------------------
+// // Function creating the menu
+// // 
+function onOpen() {
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  var ui            = SpreadsheetApp.getUi();
+  var keys          = keySheet.getSheetValues(1, 1, 1, keySheet.getLastColumn());
+  var i             = 0;
+  
+
+  var catMenu = ui.createMenu('Auto Categorize')
+      .addItem('Auto categorize selected (append)', 'keySortSelectedAppend')
+      .addItem('Auto categorize selected (overwrite)', 'keySortSelectedOverwrite')
+      .addItem('Auto categorize All (append)', 'keySortAllAppend')
+      .addItem('Auto categorize All (overwrite)', 'keySortAllOverwrite')
+      .addItem('Revert selected', 'revertSelected')
+      .addItem('Revert all', 'revertAll')
+      .addItem('Update week costs', 'weekCosts')
+      .addItem('Update menus', 'onOpen');
+                  
+  catMenu.addToUi();
+  
+  var addMenu1 = ui.createMenu('Add key to...');
+  var addMenu2 = ui.createMenu('Move amount to...');
+  
+  for(var i; i < keys[0].length;){
+    i++;
+    addMenu1.addItem(keys[0][i-1], 'addToCategory_' + i);
+    addMenu2.addItem(keys[0][i-1], 'moveAmountTo_' + i);
+  }
+  
+  addMenu1.addToUi();
+  addMenu2.addToUi();
+}
+
+// // -----------------------------------------------------
+// // Function to update all
+// // 
+function updateAll(){
+  autoCategory();
+  weekCosts();
+}
+
+// // -----------------------------------------------------
+// // Function to add a new keyword
+// // 
+function addToCategory(keyColumn){
+  var i             = 2;
+  
+  var keyString = sheet.getActiveRange().getValues()
+
+  if (typeof keyColumn === 'number'){
+    while(keySheet.getSheetValues(i, keyColumn, 1, 1) != ""){
+      i++
+    }
+    keySheet.getRange(i, keyColumn).setValue(keyString);
+  }
+}
+                       
+// // -----------------------------------------------------
+// // Function to move amount to appropriate category
+// // 
+function moveAmountTo(keyColumn){
+  // // Get range of selected
+  var activeRange   = SpreadsheetApp.getActiveSpreadsheet().getActiveRange();
+  // // Get first selected row
+  var firstRow = activeRange.getRowIndex();
+  // // Get last selected row
+  var lastRow  = activeRange.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+  // // Get start output column in active sheer
+  var startCol = findHeader(sheet, keySheet.getRange(1,1).getValues())
+  // // Get destination range in active sheet
+  var destRange    = sheet.getRange(firstRow, startCol, numRows, keySheet.getLastColumn()).getValues();
+  // // Get destination column
+  var destCol      = startCol + keyColumn - 1
+  // // Column with debit values in active sheet
+  var debCol  = findHeader(sheet, 'Debit')
+  // // The corresponding ammounts associated with the descriptions
+  var debitValues  = sheet.getSheetValues(firstRow, debCol, numRows, 1);
+  
+  sheet.getRange(firstRow, startCol, numRows, keySheet.getLastColumn()).clearContent();
+  sheet.getRange(firstRow, destCol, numRows, 1).setValues(debitValues);
+  sheet.getRange(firstRow, debCol, numRows, 1).setFontColor('blue');
+
+  
+  //sheet.getRange(firstRow, startCol, numRows, keySheet.getLastColumn()).setValues(destRange);
+  Logger.log(destRange) 
+  //Logger.log(findHeader(keySheet.getRange(1,1).getValues()))
+  
+}
+  
+
+
+function testFunction(){
+}
+
+// // -----------------------------------------------------
+// // Function to sort only the selected rows
+// // 
+function keySortSelectedAppend(){
+  
+  // // Get currently active sheet
+  var activeRange = SpreadsheetApp.getActiveRange();
+  // // Get sheet containing keywords to search
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  // // Get first selected row
+  var firstRow = activeRange.getRowIndex();
+  // // Get last selected row
+  var lastRow  = activeRange.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+
+  // // Main function
+  keySort(firstRow, lastRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), findHeader(sheet, 'Description'), findHeader(sheet, 'Debit')); 
+
+}
+
+// // -----------------------------------------------------
+// // Function to sort only the selected rows
+// // 
+function keySortSelectedOverwrite(){
+  
+  // // Get currently active sheet
+  var activeRange = SpreadsheetApp.getActiveRange();
+  // // Get sheet containing keywords to search
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  // // Get first selected row
+  var firstRow = activeRange.getRowIndex();
+  // // Get last selected row
+  var lastRow  = activeRange.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+
+  // // Main function
+  sheet.getRange(firstRow, findHeader(sheet, 'Debit'), numRows, 1).setFontColor('black');
+  sheet.getRange(firstRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), numRows, keySheet.getLastColumn()).clearContent();
+  keySort(firstRow, lastRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), findHeader(sheet, 'Description'), findHeader(sheet, 'Debit')); 
+
+}
+
+// // -----------------------------------------------------
+// // Function to sort only the selected rows
+// // 
+function keySortAllAppend(){
+  
+  // // Get first selected row
+  var firstRow = 3;
+  // // Get last selected row
+  var lastRow  = sheet.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+
+  // // Main function
+  keySort(firstRow, lastRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), findHeader(sheet, 'Description'), findHeader(sheet, 'Debit')); 
+
+}
+
+// // -----------------------------------------------------
+// // Function to sort only the selected rows
+// // 
+function keySortAllOverwrite(){
+  
+  // // Get first selected row
+  var firstRow = 3;
+  // // Get last selected row
+  var lastRow  = sheet.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+
+  // // Main function
+  sheet.getRange(firstRow, findHeader(sheet, 'Debit'), numRows, 1).setFontColor('black');
+  sheet.getRange(firstRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), numRows, keySheet.getLastColumn()).clearContent();
+  keySort(firstRow, lastRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), findHeader(sheet, 'Description'), findHeader(sheet, 'Debit')); 
+
+}
+
+// // -----------------------------------------------------
+// // Function to sort only the selected rows
+// // 
+function keySortAll(){
+  
+  // // Get currently active sheet
+  var sheet         = SpreadsheetApp.getActiveSpreadsheet();
+  // // Get sheet containing keywords to search
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  // // Get first row
+  var firstRow      = 3
+  // // Get last row
+  var lastRow       = sheet.getLastRow();
+  // // Calculate number of rows selected
+  var numRows       = lastRow - firstRow + 1;
+
+  // // Main function
+  keySort(firstRow, lastRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), findHeader(sheet, 'Description'), findHeader(sheet, 'Debit')); 
+
+}
+
+// // -----------------------------------------------------
+// // Function to find header names
+// // 
+function findHeader(sheet, headerName){
+  
+  // // INPUTS
+  // // sheet          : The sheet in which t find the header
+  // // headerName     : The header name to search for
+  
+  
+  // // CONSTANTS
+  
+  // // Get all values from the top row
+  var headerValues  = sheet.getRange(1, 1, 1, (sheet.getLastRow())).getValues()
+  
+  
+  // // MAIN FUNCTION
+  for (var i = 0; i < headerValues[0].length; i++){
+    if (headerValues[0][i].toString().toLowerCase().match(headerName.toString().toLowerCase()) == headerName.toString().toLowerCase()){
+      return i+1;
+      break;
+    }
+  }
+  return -1;
+}
+
+
+// // -----------------------------------------------------
+// // Main sorting function
+// // 
+function keySort(rowStart, rowEnd, outStart, descriptionColumn, amountColumn){
+  
+  // // INPUTS
+  
+  // // rowStart          : First row to read items in active sheet
+  // // rowEnd            : Last row to read items in active sheer
+  // // descriptionColumn : Column that contains all the individual descriptions
+  // // amountColumn      : Column that contains the value amounts that correspond to the descriptions
+  // // outStart          : Column to start the output. Corresponds to first column in keySheet
+  
+  
+  // // CONSTANTS
+  
+  // // Get currently active sheet
+  var sheet         = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  // // Get sheet containing keywords to search
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  // // Get last used row in keySheet
+  var keyRowEnd     = keySheet.getLastRow();
+  // // Get credit column in keySheet
+  var keyColCred    = findHeader(keySheet, "CREDIT");
+  Logger.log(keyColCred);
+  // // Get last column in keySheet
+  var keyColEnd     = keySheet.getLastColumn();
+  // // Get all debit keywords in 2D array.
+  var keyValuesDeb  = keySheet.getSheetValues(2, 1, keyRowEnd, keyColCred-1); 
+  // // Get all credit keywords in 2D array.
+  var keyValuesCred = keySheet.getSheetValues(2, keyColCred+1, keyRowEnd, keyColEnd); 
+  // // Number of rows to search in active spreasheet
+  var numRowsDeb    = rowEnd - rowStart + 1;
+  // // Column of actual descriptions provided by bank
+  var columnValues  = sheet.getRange(rowStart, descriptionColumn, numRowsDeb, 1).getValues();
+  // // The corresponding debit ammounts associated with the descriptions
+  var debitValues  = sheet.getSheetValues(rowStart, amountColumn, numRowsDeb, 1);
+  // // Credit ammounts associated with the descriptions
+  var creditValues  = sheet.getSheetValues(rowStart, amountColumn+1, numRowsDeb, 1);
+  // // Temp variable for storing all the newly categorised amounts before they get placed into the spreadsheet
+  var tempVar = sheet.getRange(rowStart, outStart, numRowsDeb, keyColEnd).getValues();
+  // // Array containing the two different arrays of keyValues
+  var keyValArr = [keyValuesDeb, keyValuesCred];
+  // // Array containing the two value columns
+  var ammValArr = [debitValues, creditValues];
+  
+  // // VARIABLES
+  
+  // // The current string that is being searched for
+  var searchString       = '';
+  // // The current row in the keyValues array
+  var i                  = 0;
+  // // The current column in the keyValues array
+  var j                  = 0;
+  // // The current row in current main sheet that has descriptions
+  var k                  = 0;
+  // // Array to contain the output information
+  var outArray           = [0]
+  
+  
+
+  // // MAIN LOOP FOR DEBIT VALUES
+  for (var l = 0; l < 2; l++){
+    // // iterate through all the columns of search keywords
+    for (var k = 0; k < keyValArr[l][0].length; k++){
+      // // Iterate through all the search values in column k
+      for (var j = 0; j < keyValArr[l].length; j++){
+        // // store current value to search for in variable searchString
+        var searchString = keyValArr[l][j][k];
+        // // check whether searchString is blank
+        if (searchString != ""){
+          // // Log the search string
+          Logger.log('\n\n ammValArr %s', ammValArr)
+          // // Iterate through item descriptions
+          for (var i = 0; i < numRowsDeb; i++){
+            // // Log the item description
+            //Logger.log('\nColumn Values: %s\nSearch string: %s', columnValues[i][0], searchString)
+            // // If the item description matches the search description, do the following:
+            if ((columnValues[i][0].toString().toLowerCase().match(searchString.toString().toLowerCase()) == searchString.toString().toLowerCase())
+              && ((sheet.getRange(rowStart + i, amountColumn).getFontColor()) == '#000000')
+              && (ammValArr[l][k] > 0)
+              ){
+                // // Assign the item description to the appropriate location in the tempVar array.
+                tempVar[i][k] = ammValArr[i][0];
+                sheet.getRange(rowStart + i, amountColumn).setFontColor('green');
+                //ammValArr[i][0] = "";
+                // // Tell log that an item description has been matched to a keyword.
+                Logger.log('-------MATCHED-------');
+                //Logger.log('\n\nColumn value: %s \nMatched to Key value: %s', columnValues[i][0], keyValArr[l][j][k]);
+              }
+          }
+        }
+        else{
+          break;
+        }
+      }
+    }
+  }
+  
+  
+  sheet.getRange(rowStart, outStart, numRowsDeb, keyColEnd).setValues(tempVar);
+  sheet.getRange(rowStart, amountColumn, numRowsDeb).setValues(debitValues);
+  sheet.getRange(rowStart, amountColumn+1, numRowsDeb).setValues(creditValues);
+}
+
+
+// // -----------------------------------------------------
+// // Function for reverting the auto categorization to the original column
+// // 
+function revertSelected(){
+      
+  // // Get currently active sheet
+  var activeRange = SpreadsheetApp.getActiveRange();
+  // // Get sheet containing keywords to search
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  // // Get first selected row
+  var firstRow = activeRange.getRowIndex();
+  // // Get last selected row
+  var lastRow  = activeRange.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+
+  // // Main function
+  sheet.getRange(firstRow, findHeader(sheet, 'Debit'), numRows, 1).setFontColor('black');
+  sheet.getRange(firstRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), numRows, keySheet.getLastColumn()).clearContent();
+
+}
+
+// // -----------------------------------------------------
+// // Function for reverting the auto categorization to the original column
+// // 
+function revertAll(){
+
+
+  // // Get first selected row
+  var firstRow = 3;
+  // // Get last selected row
+  var lastRow  = sheet.getLastRow();
+  // // Calculate number of rows selected
+  var numRows  = lastRow - firstRow + 1;
+
+  // // Main function
+  sheet.getRange(firstRow, findHeader(sheet, 'Debit'), numRows, 1).setFontColor('black');
+  sheet.getRange(firstRow, findHeader(sheet, keySheet.getRange(1,1).getValues()), numRows, keySheet.getLastColumn()).clearContent();
+
+}
+
+
+// // -----------------------------------------------------
+// // Function to get costs consumed by week
+// // 
+function weekCosts(){
+  var weekSheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('WEEKLYTOTALS');
+  var sheetA         = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LLOYDS Classic');
+  var spendSumCol    = 4
+  var datesA         = sheetA.getSheetValues(3, 1, sheetA.getLastRow(), 1);
+  var spendA         = sheetA.getRange(3, 10, sheetA.getLastRow(), sheetA.getLastColumn()).getValues();
+  var spendColumns   = [0, 12, 13, 14, 15, 16, 17, 18];
+  var todayRaw       = new Date();
+  var today          = todayRaw.getDate() + ((todayRaw.getMonth() + 1)*100) + (todayRaw.getFullYear() * 10000);
+  var dates          = weekSheet.getSheetValues(3, 1, weekSheet.getLastRow(), 1);
+  //var count          = 0;
+  
+ // Add up all the spending amounts in a single row (normal spending, cinema tickets, etc.)
+  for (var i = 0; i < spendA.length; i++){
+    for (var j = 0; j < (spendColumns.length - 1); j++){
+      spendA[i][0] += spendA[i][spendColumns[j+1]];
+    }
+  }
+  
+  
+  //  // Store all dates from transactions sheet A
+  for (var i = 0; i < datesA.length; i++){
+    datesA[i] = new Date(datesA[i]);
+    datesA[i] = datesA[i].getDate() + ((datesA[i].getMonth() + 1)*100) + (datesA[i].getFullYear() * 10000);
+  }
+  
+  //  // Store all dates from week sheet 
+  for (var i = 0; i < dates.length; i++){
+    dates[i] = new Date(dates[i]);
+    dates[i] = dates[i].getDate() + ((dates[i].getMonth() + 1)*100) + (dates[i].getFullYear() * 10000);
+  }
+  
+  // // Iterate through the spending column add up the values for each week
+  var j = 0;
+  for (var i = 0; i < dates.length; i++){
+    if (dates[i] > today){
+      break;
+    }
+    var count = 0;
+    for(;j < spendA.length; j++){
+      if (datesA[j] <= dates[i+1]){
+        count = +count + +spendA[j][0];
+      }
+      else{
+        break;
+      }
+    }
+
+    weekSheet.getRange(i+3, spendSumCol).setValue(count);
+  }
+
+}
+
+
+//===================================================================================
+//============= OLD SCRIPTS =========================================================
+
+// // -----------------------------------------------------
+// // Function for removing function data from cell
+// // 
+function freeze(sheetName, r, c){
+  var sheet     = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  var numFormat = (sheet.getRange(r, c)).getNumberFormat()
+  var num       = sheet.getSheetValues(r, c, 1, 1)
+  sheet.getRange(r, c).setValue(num);
+  sheet.getRange(r, c).setNumberFormat(numFormat);
+}
+
+
+// // -----------------------------------------------------
+// // Function for locking in the budget to date
+// // 
+function freezeToCurrent() {
+  //Constants
+  var numData       = 30;
+  var rowStart      = 3;
+  var columnStart   = 2;
+  var columnOfDates = 1
+  var sheetName     = 'ExpensesByWeek';
+  var sheet         = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ExpensesByWeek'); // get the sheet
+  var columnF       = sheet.getRange(rowStart, 1, sheet.getLastRow()-1); // get all the rows
+  var fValues       = columnF.getValues(); // get the values
+  var today         = new Date(); 
+  var numFormat     = (sheet.getRange(rowStart, columnStart)).getNumberFormat()
+  
+  
+  
+  for (var i = 0; i < fValues.length; i++) { // repeat loop
+    var fDate = new Date(fValues[i][0]);
+    if ((fDate.getDate() <= today.getDate() && 
+        fDate.getMonth() <= today.getMonth() && 
+        fDate.getFullYear() <= today.getFullYear()) ||
+        (fDate.getMonth() < today.getMonth() &&
+        fDate.getFullYear() <= today.getFullYear()))
+          { // if the date in the cell is less than today's date...
+          var toFreeze = sheet.getSheetValues(rowStart+i, columnStart, 1, numData);  
+          for(j=0;j<numData;j++){
+            sheet.getRange(i+rowStart, j+columnStart).setValue(toFreeze[0][j]);
+            sheet.getRange(i+rowStart, j+columnStart).setNumberFormat(numFormat);
+          }
+          sheet.getRange(i+rowStart, 1, 1, 1 + numData).setBackgroundRGB(180,230,140); // ...turn that cell green
+    }
+  }
+}
+
+// // -----------------------------------------------------
+// // Function for auto categorizing expenses for the year
+// // 
+function autoCategory(){
+  // // CONSTANTS
+  var sheet         = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
+  var searchDescrip = 'description'; searchDescrip = searchDescrip.toLowerCase();
+  var searchRow     = 1; // row index Index   
+  var rowValues     = sheet.getRange(searchRow, 1, 1, sheet.getLastColumn()).getValues();
+  var rowStart      = 3;
+  var outStart      = 0;
+  var keyRowEnd     = keySheet.getLastRow();
+  var keyColEnd     = keySheet.getLastColumn();
+  var keyValues     = keySheet.getSheetValues(2, 1, keyRowEnd, keyColEnd);
+  
+  
+  // // VARIABLES
+  var descriptionColumn  = 0;
+  var searchString       = '';
+  var i                  = 0;
+  var j                  = 0;
+  var k                  = 0;
+  var columnValues       = [0];
+  var amountColumn       = [0];
+  var amount             = 0;
+  
+  // // Run revert auto category so nothing gets lost
+  // revertAutoCategory();
+  
+  // // Find description column
+  for (i = 0; i < rowValues[0].length; i++){
+    if (rowValues[0][i].toString().toLowerCase().match(searchDescrip) == searchDescrip){
+      descriptionColumn = i+1;
+      amountColumn = sheet.getSheetValues(rowStart, i+2, sheet.getLastRow(), 1);
+      break;
+    }             
+  }
+  
+  columnValues = sheet.getRange(rowStart, descriptionColumn, sheet.getLastRow()).getValues();
+  outStart     = descriptionColumn + 4
+  
+  Logger.log(keyValues)
+  
+  // // Main loop for running through keywords
+  for (i = 0; i < keyRowEnd; i++){
+    for (j = 0; j < keyColEnd; j++){
+      searchString = keyValues[i][j];//.getText().toLowerCase();
+      //searchString = keyValues[0][6];
+      if ((keyValues[i][j] == null) || (keyValues[i][j] == 0)){
+        break;
+      }
+      // // Find string and place amount in category
+      if (searchString != ""){
+        for (k = 0; k < 10; k++){//columnValues.length; k++){
+          //if ((sheet.getRange(rowStart+k, descriptionColumn + 1) == null) || (sheet.getRange(rowStart+k, descriptionColumn + 1) == 0)){
+          //  break;
+          //}
+          if ((columnValues[k].toString().toLowerCase().match(searchString.toString().toLowerCase()) == searchString.toString().toLowerCase()) 
+            && (columnValues[k] != "")
+            && (columnValues[k].toString().toLowerCase().match("!") != "!")
+            //&& (sheet.getRange(k+rowStart, j + outStart).getValue() != 0)
+            //&& (sheet.getRange(k+rowStart, j + outStart).getValue() != null)
+            //&& (sheet.getRange(k+rowStart, j + outStart).getValue() < 100000)
+            //&& (sheet.getRange(k+rowStart, j + outStart).getValue() > -100000)
+            ){
+              //sheet.getRange(k+rowStart, j + outStart);
+              var l = sheet.getSheetValues(k+rowStart, j + outStart, 1, 1)
+              sheet.getRange(k+rowStart, j + outStart).setValue(l + amountColumn[k]);
+              sheet.getRange(k+rowStart, descriptionColumn + 1).setValue("");
+          }
+        }             
+      }
+    }
+  }
+}
