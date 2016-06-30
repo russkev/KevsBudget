@@ -105,11 +105,6 @@ function moveAmountTo(keyColumn){
   //Logger.log(findHeader(keySheet.getRange(1,1).getValues()))
   
 }
-  
-
-
-function testFunction(){
-}
 
 // // -----------------------------------------------------
 // // Function to sort only the selected rows
@@ -255,10 +250,6 @@ function keySort(rowStart, rowEnd, outStart, descriptionColumn, amountColumn){
   
   // // CONSTANTS
   
-  // // Get currently active sheet
-  var sheet         = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  // // Get sheet containing keywords to search
-  var keySheet      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Keywords');
   // // Get last used row in keySheet
   var keyRowEnd     = keySheet.getLastRow();
   // // Get credit column in keySheet
@@ -342,6 +333,75 @@ function keySort(rowStart, rowEnd, outStart, descriptionColumn, amountColumn){
   sheet.getRange(rowStart, outStart, numRowsDeb, keyColEnd).setValues(tempVar);
   sheet.getRange(rowStart, amountColumn, numRowsDeb).setValues(debitValues);
   sheet.getRange(rowStart, amountColumn+1, numRowsDeb).setValues(creditValues);
+}
+
+// // -----------------------------------------------------
+// // TEST FUNCTION
+// // 
+function testFunction(){
+  var creditRow = findHeader(keySheet, "credit")
+  var descriptionArray = sheet.getRange(10, 5, 7).getValues();
+  var amountArray = sheet.getRange(10, 6, 7).getValues();
+  var sortedArray = sheet.getRange(10, 9, 7, creditRow).getValues();
+  var keyArray = keySheet.getRange(2, 1, keySheet.getLastRow(), creditRow).getValues();
+
+  Logger.log(sort(descriptionArray, amountArray, keyArray, sortedArray));
+  Logger.log(sortedArray);
+}
+
+
+
+
+// // -----------------------------------------------------
+// // Function to sort amount values into the sortedArray
+// //
+function sort(descriptionArray, amountArray, keyArray, sortedArray){
+  
+  // // Check that number of rows in sorted array, description array and amount array match
+  // // Also check that the number of columns in the keyArray and sortedArray match.
+  if (descriptionArray.length != amountArray.length 
+    || descriptionArray.length != sortedArray.length
+     || keyArray[0].length != sortedArray[0].length){
+    return false;
+  }
+  
+  
+  for (var i = 0; i < amountArray.length; i++){
+    var keyColumn = findKeyColumn(keyArray, descriptionArray[i]);
+    if (keyColumn >= 0){
+      sortedArray[i][keyColumn] = amountArray[i];
+    }
+  }
+  return true;
+}
+
+
+
+// // -----------------------------------------------------
+// // If key word found, returns the column where the value was found
+// // Otherwise return -1
+// //
+function findKeyColumn(keyArray, descriptionString){
+  for (var i = 0; i < keyArray.length; i++){
+    for (var j = 0; j < keyArray[0].length; j++){
+      if (keyPresent(keyArray[i][j], descriptionString)){
+        return j;
+      }
+    }
+  }
+  return -1;
+}
+
+// // -----------------------------------------------------
+// // Boolean function. True if key word is present in description string.
+// // 
+function keyPresent(keyWord, descriptionString){
+  if (keyWord == "" || descriptionString == ""){
+    return false;
+  }
+  else{
+    return (descriptionString.toString().toLowerCase().match(keyWord.toString().toLowerCase()) == keyWord.toString().toLowerCase())
+  }
 }
 
 
